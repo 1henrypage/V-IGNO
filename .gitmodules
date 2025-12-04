@@ -1,0 +1,3 @@
+[submodule "DGenNO"]
+	path = DGenNO
+	url = git@github.com:1henrypage/DGenNO.git
