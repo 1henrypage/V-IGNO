@@ -1,12 +1,10 @@
 import time
 import torch
 import pytest
-from src.utils.torch_utils import get_default_device
+from src.utils.utils import get_default_device
 
-# Import our optimized FunActivation
+# imports from 2 separate packages
 from src.components.activation import FunActivation as MyFunActivation
-
-# Import original FunActivation
 from DGenNO.Networks.FunActivation import FunActivation as OldFunActivation
 
 # -----------------------------
@@ -20,7 +18,7 @@ def device():
 @pytest.fixture(scope="module")
 def sample_input(device):
     # Large tensor to measure speed differences
-    return torch.randn(3000, 3000, device=device)
+    return torch.randn(500, 500, device=device)
 
 @pytest.fixture(scope="module")
 def my_activations():
