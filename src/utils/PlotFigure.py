@@ -1,4 +1,6 @@
 
+import matplotlib
+
 # Stolen from DGNO
 import numpy as np
 import matplotlib.pyplot as plt

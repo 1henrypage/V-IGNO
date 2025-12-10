@@ -1,7 +1,7 @@
 import time
 import torch
 import pytest
-from src.utils.utils import get_default_device
+from src.utils.misc_utils import get_default_device
 
 # imports from 2 separate packages
 from src.components.activation import FunActivation as MyFunActivation

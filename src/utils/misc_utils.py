@@ -1,3 +1,4 @@
+# Stolen from DGenNO
 import torch
 import numpy as np
 
@@ -5,10 +6,10 @@ def get_default_device() -> torch.device:
     """ Returns GPU if available, else CPU. """
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def np2tensor(x:np.array, dtype=torch.float32):
+def np2tensor(x:np.array, dtype=torch.float32, device: str | torch.device = torch.device("cuda")):
     '''From numpy.array to torch.tensor
     '''
-    return torch.tensor(x, dtype=dtype)
+    return torch.tensor(x, dtype=dtype, device=device)
 
 def detach2np(x:torch.tensor):
     '''Detach -> cpu -> numpy
