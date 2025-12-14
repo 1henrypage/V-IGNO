@@ -2,6 +2,22 @@ from dataclasses import dataclass, asdict
 from typing import Literal, Optional
 import yaml
 from pathlib import Path
+import torch
+import numpy as np
+
+def serialize_scalars(d: dict):
+    """Recursively convert NumPy and torch scalars to native Python types."""
+    result = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            result[k] = serialize_scalars(v)
+        elif isinstance(v, np.integer):
+            result[k] = int(v)
+        elif isinstance(v, (np.floating, torch.Tensor)):
+            result[k] = float(v)
+        else:
+            result[k] = v
+    return result
 
 @dataclass(frozen=True)
 class LossWeights:
@@ -12,7 +28,7 @@ class LossWeights:
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'w') as f:
-            yaml.safe_dump(asdict(self), f)
+            yaml.safe_dump(serialize_scalars(asdict(self)), f)
 
 
 @dataclass
@@ -26,7 +42,7 @@ class SchedulerConfig:
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'w') as f:
-            yaml.safe_dump(asdict(self), f)
+            yaml.safe_dump(serialize_scalars(asdict(self)), f)
 
 
 @dataclass
@@ -37,4 +53,4 @@ class OptimizerConfig:
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'w') as f:
-            yaml.safe_dump(asdict(self), f)
+            yaml.safe_dump(serialize_scalars(asdict(self)), f)

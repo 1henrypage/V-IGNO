@@ -50,5 +50,4 @@ class FunActivation:
         key = type.lower()
         if key not in self.activation:
             raise ValueError(f"Activation '{type}' not found. Available: {list(self.activation.keys())}")
-        act_module = self.activation[key]()
-        return torch.jit.script(act_module)
+        return self.activation[key]()  # <-- just return the raw nn.Module

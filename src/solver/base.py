@@ -101,6 +101,29 @@ class ProblemInstance(ABC):
             reduction=reduction
         )(loss_type)
 
+    def pre_train_check(self) -> None:
+        """
+        This is useful if we don't do any custom losses.
+        The solver will initialise the default settings.
+
+        Logic:
+        - If both get_loss and get_error are None, call init_loss() and init_error()
+        - If exactly one of them is None, raise an error
+        - Otherwise, do nothing
+        """
+        loss_none = self.get_loss is None
+        error_none = self.get_error is None
+
+        if loss_none and error_none:
+            # Initialize both
+            self.init_loss()
+            self.init_error()
+        elif loss_none != error_none:  # XOR: exactly one is None
+            raise ValueError("Both get_loss and get_error must be set, or both None to auto-initialize.")
+        # else: both are already set, do nothing
+
+
+
 
 class Solver:
     """
@@ -110,12 +133,10 @@ class Solver:
     def __init__(
             self,
             problem_instance: ProblemInstance,
-            device: torch.device | str = get_default_device(),
-            dtype: torch.dtype = torch.float32
     ):
         self.problem_instance = problem_instance
-        self.device = device
-        self.dtype = dtype
+        self.device = problem_instance.device
+        self.dtype = problem_instance.dtype
 
         # Forward declare
         self.model_dict = None
@@ -184,13 +205,18 @@ class Solver:
         torch.save(self.model_dict, save_path)
 
 
-    def init_scheduler_and_optimizer(
+    def pre_train_init(
             self,
             scheduler_config: SchedulerConfig,
             optimizer_config: OptimizerConfig
     ) -> None:
         self.model_dict = self.problem_instance.get_model_dict()
         param_list = []
+
+        for k in self.model_dict:
+            self.model_dict[k] = self.model_dict[k].to(self.device)
+
+
         for model in self.model_dict.values():
             param_list += list(model.parameters())
 
@@ -242,6 +268,8 @@ class Solver:
             **kwrds
     ):
 
+        self.problem_instance.pre_train_check()
+
         # ---- Generate run name ----
         self.init_logging(
             loss_weights=loss_weights,
@@ -251,7 +279,7 @@ class Solver:
         )
 
         # INIT
-        self.init_scheduler_and_optimizer(
+        self.pre_train_init(
             scheduler_config=scheduler_config,
             optimizer_config=optimizer_config
         )
@@ -336,6 +364,6 @@ class Solver:
                 for para in self.optimizer.param_groups:
                     print(f"                l2_test:{error_test.item():.4f}, lr:{para['lr']}")
 
-            self.save_models(filename='last.pt')
+        self.save_models(filename='last.pt')
 
-            print(f'The total training time is {time.time() - t_start:.4f}')
+        print(f'The total training time is {time.time() - t_start:.4f}')
