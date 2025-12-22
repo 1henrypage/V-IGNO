@@ -30,20 +30,20 @@ class ProblemInstance(ABC):
         self.device = device
         self.dtype = dtype
 
-        # INIT
-        self.init_error()
-        self.init_loss()
-
         # Forward declare
         self.get_loss = None
         self.get_error = None
+
+        # INIT
+        self.init_error()
+        self.init_loss()
 
     @abstractmethod
     def loss_pde(
             self,
             a: torch.Tensor
     ) -> torch.Tensor:
-        return 0
+        raise NotImplementedError
 
     @abstractmethod
     def loss_data(
@@ -52,11 +52,11 @@ class ProblemInstance(ABC):
             a: torch.Tensor,
             u: torch.Tensor
     ) -> torch.Tensor:
-        return 0
+        raise NotImplementedError
 
     @abstractmethod
     def get_model_dict(self) -> Dict[str, nn.Module]:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def error(
@@ -65,7 +65,7 @@ class ProblemInstance(ABC):
             a: torch.Tensor,
             u: torch.Tensor
     ) -> torch.Tensor:
-        return 0
+        raise NotImplementedError
 
     def init_error(
             self,
@@ -114,9 +114,6 @@ class ProblemInstance(ABC):
             raise ValueError("Both get_loss and get_error must be set, or both None to auto-initialize.")
         # else: both are already set, do nothing
 
-
-
-
 class Solver:
     """
     Base class for all solvers.
@@ -149,8 +146,8 @@ class Solver:
         run_dir = ARTIFACT_DIR / run_name
         self.weights_dir = run_dir / "weights"
         self.tb_dir = run_dir / "tb"
-        self.weights_dir.mkdir(parents=True)
-        self.tb_dir.mkdir(parents=True)
+        self.weights_dir.mkdir(parents=True, exist_ok=True)
+        self.tb_dir.mkdir(parents=True, exist_ok=True)
 
         # Save config
         config.save(run_dir / "config.yaml")

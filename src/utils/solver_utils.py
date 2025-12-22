@@ -9,24 +9,41 @@ from src.components.mon import MultiONetBatch, MultiONetBatch_X
 from src.solver.config import OptimizerConfig, SchedulerConfig
 from src.utils.misc_utils import get_default_device
 
+def var_data_loader(
+        *tensors: torch.Tensor,
+        batch_size: int = 100,
+        shuffle: bool = True
+) -> DataLoader:
+    """
+    Loads a variable number of tensors into a DataLoader.
+    All tensors must have the same first dimension.
+    """
+    if len(tensors) == 0:
+        raise ValueError("At least one tensor must be provided")
+
+    first_dim = tensors[0].shape[0]
+    if not all(t.shape[0] == first_dim for t in tensors):
+        raise ValueError("All tensors must have the same first dimension")
+
+    dataset = TensorDataset(*tensors)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 def data_loader(
         a: torch.Tensor,
         u: torch.Tensor,
         x: Optional[torch.Tensor] = None,
         batch_size: int = 100,
-        shuffle=True
+        shuffle: bool = True
 ) -> DataLoader:
     """
     Loads data into a data loader for training
+    Uses var_data_loader internally
     """
-    assert a.shape[0] == u.shape[0] == x.shape[0]
-    dataset = TensorDataset(a, u, x)
-    return DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-    )
+    tensors = [a, u]
+    if x is not None:
+        tensors.append(x)
+
+    return var_data_loader(*tensors, batch_size=batch_size, shuffle=shuffle)
 
 def get_model(x_in_size: int, beta_in_size: int,
               trunk_layers: list[int], branch_layers: list[int],
