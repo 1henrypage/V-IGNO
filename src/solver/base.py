@@ -135,26 +135,7 @@ class Solver:
         self.weights_dir = None
         self.tb_dir = None
 
-    def init_logging(
-            self,
-            config: TrainingConfig,
-            custom_run_tag: str = None
-    ) -> None:
 
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        run_name = f"{timestamp}_{custom_run_tag}" if custom_run_tag else timestamp
-        run_dir = ARTIFACT_DIR / run_name
-        self.weights_dir = run_dir / "weights"
-        self.tb_dir = run_dir / "tb"
-        self.weights_dir.mkdir(parents=True, exist_ok=True)
-        self.tb_dir.mkdir(parents=True, exist_ok=True)
-
-        # Save config
-        config.save(run_dir / "config.yaml")
-
-        self.writer = SummaryWriter(
-            log_dir=str(self.tb_dir)
-        )
 
     def log_epoch(
             self,
@@ -202,29 +183,52 @@ class Solver:
             else:
                 raise RuntimeError(f"No model state dict found for {name}")
 
-    def pre_train_init(
+    def setup(
             self,
-            config: TrainingConfig
+            config: TrainingConfig,
+            custom_run_tag: Optional[str] = None
     ) -> None:
-        self.model_dict = self.problem_instance.get_model_dict()
-        param_list = []
 
-        for k in self.model_dict:
-            self.model_dict[k] = self.model_dict[k].to(self.device)
+        def _setup_weights() -> None:
+            self.model_dict = self.problem_instance.get_model_dict()
+            param_list = []
 
+            for k in self.model_dict:
+                self.model_dict[k] = self.model_dict[k].to(self.device)
 
-        for model in self.model_dict.values():
-            param_list += list(model.parameters())
+            for model in self.model_dict.values():
+                param_list += list(model.parameters())
 
-        self.optimizer = get_optimizer(
-            optimizer_config=config.optimizer,
-            param_list=param_list,
-        )
+            self.optimizer = get_optimizer(
+                optimizer_config=config.optimizer,
+                param_list=param_list,
+            )
 
-        self.scheduler = get_scheduler(
-            scheduler_config=config.scheduler,
-            optimizer=self.optimizer,
-        )
+            self.scheduler = get_scheduler(
+                scheduler_config=config.scheduler,
+                optimizer=self.optimizer,
+            )
+
+        def _setup_log() -> None:
+            timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            run_name = f"{timestamp}_{custom_run_tag}" if custom_run_tag else timestamp
+            run_dir = ARTIFACT_DIR / run_name
+            self.weights_dir = run_dir / "weights"
+            self.tb_dir = run_dir / "tb"
+            self.weights_dir.mkdir(parents=True, exist_ok=True)
+            self.tb_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save config
+            config.save(run_dir / "config.yaml")
+
+            self.writer = SummaryWriter(
+                log_dir=str(self.tb_dir)
+            )
+
+        # INIT steps
+        self.problem_instance.pre_train_check()
+        _setup_weights()
+        _setup_log()
 
     def activate_train(self) -> None:
         for model in self.model_dict.values():
@@ -262,19 +266,10 @@ class Solver:
             **kwrds
     ):
 
-        self.problem_instance.pre_train_check()
-
-        # ---- Generate run name ----
-        self.init_logging(
+        self.setup(
             config=config,
             custom_run_tag=custom_run_tag
         )
-
-        # INIT
-        self.pre_train_init(
-            config=config
-        )
-
         # Loaders
         train_loader = data_loader(
             a=a_train,
