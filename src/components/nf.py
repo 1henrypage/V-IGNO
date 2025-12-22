@@ -4,7 +4,7 @@ import torch.nn as nn
 from typing import Tuple
 import matplotlib.pyplot as plt
 
-from src.solver.config import NFConfig
+from src.solver.config import SecondStageConfig
 from src.utils.misc_utils import get_default_device
 
 # ============================================================
@@ -130,7 +130,7 @@ class RealNVP(nn.Module):
 
     def __init__(
             self,
-            config: NFConfig,
+            config: SecondStageConfig,
     ):
         super().__init__()
         self.latent_dim = config.dim
@@ -271,7 +271,7 @@ if __name__ == '__main__':
     # Initialize model
     print("Initializing RealNVP model...")
     model = RealNVP(
-        config=NFConfig(
+        config=SecondStageConfig(
             dim=2,
             num_flows=6,
             hidden_dim=128,

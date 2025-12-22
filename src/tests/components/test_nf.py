@@ -8,7 +8,7 @@ from src.components.nf import (
     RealNVP,
     create_2d_mixture_data,
 )
-from src.solver.config import NFConfig
+from src.solver.config import SecondStageConfig
 
 
 # -------------------------
@@ -22,7 +22,7 @@ def device():
 
 @pytest.fixture
 def small_config():
-    return NFConfig(
+    return SecondStageConfig(
         dim=2,
         num_flows=2,
         hidden_dim=32,
