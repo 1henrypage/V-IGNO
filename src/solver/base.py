@@ -3,14 +3,13 @@ import torch
 import torch.nn as nn
 import time
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Literal
+from typing import Optional, Dict
 from tqdm import trange
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from pathlib import Path
 
-
-from src.solver.config import SchedulerConfig, OptimizerConfig, LossWeights
+from src.solver.config import TrainingConfig
 from src.utils.Losses import MyError, MyLoss
 from src.utils.misc_utils import get_default_device, get_project_root
 from src.utils.solver_utils import get_optimizer, get_scheduler, data_loader
@@ -38,13 +37,6 @@ class ProblemInstance(ABC):
         # Forward declare
         self.get_loss = None
         self.get_error = None
-
-    @abstractmethod
-    def loss_beta(
-            self,
-            a: torch.Tensor
-    ) -> Optional[torch.Tensor]:
-        return 0
 
     @abstractmethod
     def loss_pde(
@@ -148,9 +140,7 @@ class Solver:
 
     def init_logging(
             self,
-            loss_weights: LossWeights,
-            optimizer_config: OptimizerConfig,
-            scheduler_config: SchedulerConfig,
+            config: TrainingConfig,
             custom_run_tag: str = None
     ) -> None:
 
@@ -163,9 +153,7 @@ class Solver:
         self.tb_dir.mkdir(parents=True)
 
         # Save config
-        (loss_weights.save(run_dir / "loss_weights.yaml"))
-        (optimizer_config.save(run_dir / "optimizer_config.yaml"))
-        (scheduler_config.save(run_dir / "scheduler_config.yaml"))
+        config.save(run_dir / "config.yaml")
 
         self.writer = SummaryWriter(
             log_dir=str(self.tb_dir)
@@ -178,7 +166,6 @@ class Solver:
             loss_pde: torch.Tensor,
             loss_test: torch.Tensor,
             error_test: torch.Tensor,
-            t_start: float,
             epoch: int
     ):
         self.writer.add_scalar("train/loss_train", loss_train.item(), epoch)
@@ -187,7 +174,6 @@ class Solver:
 
         # --- Log test loss ---
         self.writer.add_scalar("test/loss", loss_test.item(), epoch)
-        self.writer.add_scalar("train/time", time.time() - t_start)
 
         # --- Log test error ---
         if error_test.numel() > 1:
@@ -221,8 +207,7 @@ class Solver:
 
     def pre_train_init(
             self,
-            scheduler_config: SchedulerConfig,
-            optimizer_config: OptimizerConfig
+            config: TrainingConfig
     ) -> None:
         self.model_dict = self.problem_instance.get_model_dict()
         param_list = []
@@ -235,12 +220,12 @@ class Solver:
             param_list += list(model.parameters())
 
         self.optimizer = get_optimizer(
-            optimizer_config=optimizer_config,
+            optimizer_config=config.optimizer,
             param_list=param_list,
         )
 
         self.scheduler = get_scheduler(
-            scheduler_config=scheduler_config,
+            scheduler_config=config.scheduler,
             optimizer=self.optimizer,
         )
 
@@ -255,9 +240,9 @@ class Solver:
     def scheduler_step(
             self,
             error_test: torch.Tensor,
-            scheduler_config: SchedulerConfig
+            config: TrainingConfig
     ) -> None:
-        scheduler_type = scheduler_config.type
+        scheduler_type = config.scheduler.type
 
         if scheduler_type is None:
             pass
@@ -271,9 +256,7 @@ class Solver:
             self,
             a_train, u_train, x_train,
             a_test, u_test, x_test,
-            optimizer_config: OptimizerConfig = OptimizerConfig(),
-            scheduler_config: SchedulerConfig = SchedulerConfig(),
-            loss_weights: LossWeights = LossWeights(),
+            config: TrainingConfig,
             batch_size: int = 100,
             epochs: int = 1,
             epoch_show: int = 10,
@@ -286,16 +269,13 @@ class Solver:
 
         # ---- Generate run name ----
         self.init_logging(
-            loss_weights=loss_weights,
-            optimizer_config=optimizer_config,
-            scheduler_config=scheduler_config,
+            config=config,
             custom_run_tag=custom_run_tag
         )
 
         # INIT
         self.pre_train_init(
-            scheduler_config=scheduler_config,
-            optimizer_config=optimizer_config
+            config=config
         )
 
         # Loaders
@@ -321,15 +301,14 @@ class Solver:
         for epoch in trange(epochs):
 
             self.activate_train()
-            loss_train_sum, loss_data_sum, loss_pde_sum, loss_beta_sum = 0., 0., 0., 0.
+            loss_train_sum, loss_data_sum, loss_pde_sum = 0., 0., 0.
 
             for a, u, x in train_loader:
                 a,u,x = a.to(self.device), u.to(self.device), x.to(self.device)
 
                 loss_pde = self.problem_instance.loss_pde(a)
                 loss_data = self.problem_instance.loss_data(x,a,u)
-                loss_beta = self.problem_instance.loss_beta(a)
-                loss_train = loss_pde * loss_weights.pde+ loss_data * loss_weights.data+ loss_beta * loss_weights.beta
+                loss_train = loss_pde * config.loss_weights.pde+ loss_data * config.loss_weights.data
 
                 self.optimizer.zero_grad()
                 loss_train.backward()
@@ -338,7 +317,6 @@ class Solver:
                 loss_train_sum += loss_train
                 loss_data_sum += loss_data
                 loss_pde_sum += loss_pde
-                loss_beta_sum += loss_beta
 
             self.activate_eval()
             loss_test_sum = 0
@@ -357,7 +335,6 @@ class Solver:
                 loss_pde=loss_pde_sum/len(train_loader),
                 loss_test=loss_test_sum/len(test_loader),
                 error_test=error_test_sum/len(test_loader),
-                t_start=t_start,
                 epoch=epoch,
             )
 
@@ -369,7 +346,7 @@ class Solver:
             # Possible scheduler step
             self.scheduler_step(
                 error_test=error_test,
-                scheduler_config=scheduler_config
+                config=config
             )
 
             if (epoch + 1) % epoch_show == 0:
