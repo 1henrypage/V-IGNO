@@ -4,6 +4,7 @@ import torch.nn as nn
 from typing import Tuple
 import matplotlib.pyplot as plt
 
+from src.solver.config import NFConfig
 from src.utils.misc_utils import get_default_device
 
 # ============================================================
@@ -129,22 +130,19 @@ class RealNVP(nn.Module):
 
     def __init__(
             self,
-            latent_dim: int,
-            num_flows: int = 6,
-            hidden_dim: int = 128,
-            num_layers: int = 3
+            config: NFConfig,
     ):
         super().__init__()
-        self.latent_dim = latent_dim
+        self.latent_dim = config.dim
 
         self.flows = nn.ModuleList([
             CouplingLayer(
-                dim=latent_dim,
-                hidden_dim=hidden_dim,
-                num_layers=num_layers,
+                dim=config.dim,
+                hidden_dim=config.hidden_dim,
+                num_layers=config.num_layers,
                 flip_mask=(i % 2 == 1)
             )
-            for i in range(num_flows)
+            for i in range(config.num_flows)
         ])
 
         self.register_buffer("log_2pi", torch.log(torch.tensor(2 * torch.pi)))
@@ -273,10 +271,12 @@ if __name__ == '__main__':
     # Initialize model
     print("Initializing RealNVP model...")
     model = RealNVP(
-        latent_dim=2,
-        num_flows=6,
-        hidden_dim=128,
-        num_layers=3
+        config=NFConfig(
+            dim=2,
+            num_flows=6,
+            hidden_dim=128,
+            num_layers=3
+        )
     ).to(device)
 
     # Optimizer

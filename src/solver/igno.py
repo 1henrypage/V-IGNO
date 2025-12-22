@@ -7,7 +7,7 @@ class IGNOSolver(Solver):
     def __init__(
             self,
             problem_instance: ProblemInstance,
-            beta_dim: int
+            beta_dim: int,
     ):
         super().__init__(
             problem_instance=problem_instance
@@ -15,7 +15,6 @@ class IGNOSolver(Solver):
 
         self.real_nvp = RealNVP(
             latent_dim=128
-
         )
 
     def learn_mapping(self):
